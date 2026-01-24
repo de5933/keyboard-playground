@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Keyboard Playground</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #f7f7f8;
+			margin: 0;
+			padding: 0;
+			height: 100vh;
+			display: flex;
+    }
+		.hint {
+			position: absolute;
+			top: 10px;
+			width: 100%;
+			text-align: center;
+			font-size: 1rem;
+			color: #888;
+			user-select: none;
+			font-weight: bold;
+		}
+    #display {
+			font-size: 15rem;
+			font-weight: bold;
+			margin-top: 20px;
+			border: 2px solid #444;
+			justify-content: center;
+			border-radius: 24px;
+			box-shadow: 0 4px 32px rgba(0, 0, 0, 0.10);
+			user-select: none;
+			letter-spacing: 0.025em;
+			line-height: 1.1;
+			margin: auto;
+			text-align: center;
+			box-sizing: border-box;
+			padding: 0.3em;
+			text-shadow: 0 0 4px black;
+    }
+    #display.fade {
+      opacity: 0;
+			transition: opacity 0.7s;
+    }
+    .fullscreen {
+      background: #15181b;
+      color: #f7f7f8;
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">Press any key</div>
+  <div id="display">_</div>
+  <script>
+    const display = document.getElementById('display');
+    let buffer = '';
+    const TOGGLE_WORD = 'ishaan';
+    let isFullscreen = false;
+    let fadeTimeout = null;
+
+    // Pseudorandom color generator based on key string
+    function keyToColor(key) {
+      let str = String(key);
+      let hash = 5381;
+      for(let i=0; i<str.length; i++) {
+        hash = ((hash << 5) + hash) + str.charCodeAt(i);
+        hash = hash & 0xFFFFFFFF;
+      }
+      let hue = Math.abs(hash) % 360;
+      let sat = 68 + ((Math.abs(hash) >> 4) % 20);
+      let light = 54 + ((Math.abs(hash) >> 8) % 15);
+      return `hsl(${hue},${sat}%,${light}%)`;
+    }
+
+		function keyToColor2(key) {
+			const supportedKeys = 'abcdefghijklmnopqrstuvwxyz0123456789;'
+			if (supportedKeys.includes(key.toLowerCase())) {
+				const size = supportedKeys.length;
+				const index = supportedKeys.indexOf(key.toLowerCase());
+				const hue = Math.floor((index / size) * 360);
+				return `hsl(${hue}, 70%, 50%)`;
+			} else {
+				return '#444444';
+			}
+		}
+
+    const blockedKeys = [
+      'Tab', 'F1', 'F3', 'F4', 'F5', 'F11', 'F12', 'Escape',
+      'r', 'w', 'n', 't', 'q',
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End',
+      'p', 's', 'o'
+    ];
+    function isMod(e, mod) {
+      switch (mod) {
+        case 'ctrl': return e.ctrlKey;
+        case 'alt': return e.altKey;
+        case 'meta': return e.metaKey;
+        case 'shift': return e.shiftKey;
+        default: return false;
+      }
+    }
+    function preventNavKeys(e) {
+      if (
+        ['F5','F11','F12','F1','F3','F4','Escape'].includes(e.key)
+        || (isMod(e, 'ctrl') && blockedKeys.includes(e.key.toLowerCase()))
+        || (e.ctrlKey && e.shiftKey && blockedKeys.includes(e.key.toLowerCase()))
+        || (isMod(e, 'alt') && ['ArrowLeft', 'ArrowRight'].includes(e.key))
+        || (isMod(e, 'meta') && blockedKeys.includes(e.key.toLowerCase()))
+        || (e.altKey && ['Tab', 'F4'].includes(e.key))
+        || (!e.ctrlKey && !e.altKey && !e.metaKey && e.key === 'Tab')
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === 'Tab') document.activeElement && document.activeElement.blur();
+        return false;
+      }
+      return true;
+    }
+
+    function formatKeyDisplay(key) {
+      key[0] = key[0].toUpperCase();
+			switch (key) {
+				case 'ArrowUp':
+					return '↑';
+				case 'ArrowDown':
+					return '↓';
+				case 'ArrowLeft':
+					return '←';
+				case 'ArrowRight':
+					return '→';
+				case 'Control':
+					return 'Ctrl';
+				case 'Escape':
+					return 'Esc';
+				default:
+					return key.length === 1 ? key.toUpperCase() : key;
+			}
+    }
+
+    function startFadeTimer() {
+      if (fadeTimeout) clearTimeout(fadeTimeout);
+      display.classList.remove('fade');
+      fadeTimeout = setTimeout(() => {
+        display.classList.add('fade');
+      }, 1000);
+    }
+
+    function keyHandler(e) {
+      preventNavKeys(e);
+
+      let key = e.key === ' ' ? 'Space' : e.key;
+      let showKey = formatKeyDisplay(key);
+
+      display.textContent = showKey;
+      display.style.background = keyToColor2(key);
+      display.style.color = '#fff';
+      display.setAttribute('aria-label', "Last key pressed: " + showKey);
+
+      startFadeTimer();
+
+      if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+        buffer += e.key.toLowerCase();
+        if (buffer.length > TOGGLE_WORD.length) buffer = buffer.slice(-TOGGLE_WORD.length);
+      }
+      if (buffer === TOGGLE_WORD) {
+        buffer = '';
+        toggleFullscreenCapture();
+      }
+    }
+
+    function toggleFullscreenCapture() {
+      if (!isFullscreen) {
+        enterFullscreen();
+        document.body.classList.add('fullscreen');
+        isFullscreen = true;
+      } else {
+        exitFullscreen();
+        document.body.classList.remove('fullscreen');
+        isFullscreen = false;
+      }
+    }
+
+    function enterFullscreen() {
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen();
+      } else if (document.documentElement.webkitRequestFullscreen) {
+        document.documentElement.webkitRequestFullscreen();
+      } else if (document.documentElement.msRequestFullscreen) {
+        document.documentElement.msRequestFullscreen();
+      }
+    }
+    function exitFullscreen() {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && isFullscreen) {
+        isFullscreen = false;
+        document.body.classList.remove('fullscreen');
+      }
+    });
+
+    window.addEventListener('keydown', keyHandler, true);
+    window.addEventListener('keypress', preventNavKeys, true);
+    window.addEventListener('keyup', preventNavKeys, true);
+    window.addEventListener('keydown', preventNavKeys, true);
+
+    window.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
+
+    window.addEventListener('blur', e => {
+      if (isFullscreen) {
+        window.focus();
+      }
+    });
+
+    if (document.documentElement.requestPointerLock) {
+      document.body.addEventListener('click', function () {
+        if (isFullscreen && document.pointerLockElement !== document.body) {
+          document.body.requestPointerLock();
+        }
+      });
+    }
+
+    // Remove fade immediately when mouse enters the box, so it can be "woken up" visually
+    display.addEventListener('mouseenter', () => {
+      display.classList.remove('fade');
+      if (fadeTimeout) clearTimeout(fadeTimeout);
+    });
+  </script>
+</body>
+</html>
